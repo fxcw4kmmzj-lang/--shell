@@ -7,11 +7,18 @@ final class ShellEngine: ObservableObject {
     @Published var lines: [TerminalLine] = []
     @Published var cwd = "/"
 
-    struct Node: Codable {
+    final class Node: Codable {
         var name: String
         var isDir: Bool
         var content: String = ""
         var children: [Node] = []
+
+        init(name: String, isDir: Bool, content: String = "", children: [Node] = []) {
+            self.name = name
+            self.isDir = isDir
+            self.content = content
+            self.children = children
+        }
     }
 
     private var root = Node(name: "/", isDir: true)
@@ -76,7 +83,7 @@ final class ShellEngine: ObservableObject {
     private func normalized(_ path: String) -> [String] {
         var comps = path == "/" || path.isEmpty
             ? [] : path.split(separator: "/").map(String.init)
-        if path.hasPrefix("/") { return resolve(comps) }
+        if path.hasPrefix("/") { return comps }
         var cur = cwd == "/" ? [] : cwd.split(separator: "/").map(String.init)
         for c in comps {
             if c == "." { continue }
@@ -85,7 +92,6 @@ final class ShellEngine: ObservableObject {
         }
         return cur
     }
-    private func resolve(_ comps: [String]) -> [String] { comps }
 
     private func node(at comps: [String]) -> Node? {
         var cur = root
@@ -97,8 +103,7 @@ final class ShellEngine: ObservableObject {
     }
 
     private func parent(of comps: [String]) -> (Node, String)? {
-        guard var cur = node(at: Array(comps.dropLast())) else { return nil }
-        guard cur.isDir else { return nil }
+        guard let cur = node(at: Array(comps.dropLast())), cur.isDir else { return nil }
         return (cur, comps.last ?? "")
     }
 
@@ -140,7 +145,8 @@ final class ShellEngine: ObservableObject {
 
     private func writeToFile(_ text: String, to path: String) {
         let comps = normalized(path)
-        guard comps.count > 0, let (par, name) = parent(of: comps) else { return }
+        guard comps.count > 0, let par = node(at: Array(comps.dropLast())), par.isDir else { return }
+        let name = comps.last ?? ""
         if let i = par.children.firstIndex(where: { $0.name == name }) {
             par.children[i].content = text
         } else {
@@ -179,12 +185,12 @@ final class ShellEngine: ObservableObject {
         case "touch":
             guard let (par, name) = parent(of: normalized(args.first ?? "")) else { return [("touch: bad path", C.red)] }
             if !par.children.contains(where: { $0.name == name }) {
-                par.children.append(.init(name: name, isDir: false))
+                par.children.append(Node(name: name, isDir: false))
             }
             return []
         case "mkdir":
             guard let (par, name) = parent(of: normalized(args.first ?? "")) else { return [("mkdir: bad path", C.red)] }
-            par.children.append(.init(name: name, isDir: true))
+            par.children.append(Node(name: name, isDir: true))
             return []
         case "rm":
             guard let (par, name) = parent(of: normalized(args.first ?? "")) else { return [("rm: bad path", C.red)] }
@@ -197,7 +203,7 @@ final class ShellEngine: ObservableObject {
             if let i = par.children.firstIndex(where: { $0.name == name }) {
                 par.children[i].content = text
             } else {
-                par.children.append(.init(name: name, isDir: false, content: text))
+                par.children.append(Node(name: name, isDir: false, content: text))
             }
             return []
         case "clear":
