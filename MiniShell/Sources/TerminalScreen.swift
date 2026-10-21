@@ -26,7 +26,7 @@ struct TerminalScreen: View {
                     .font(.system(.headline, design: .monospaced))
                     .foregroundColor(.accentColor)
                 Spacer()
-                Text(shell.cwd.lastPathComponent.isEmpty ? "/" : "/" + shell.cwd.lastPathComponent)
+                Text(cwdLabel)
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(.secondary)
             }
@@ -84,6 +84,11 @@ struct TerminalScreen: View {
         .background(Color.black.ignoresSafeArea())
         .onTapGesture { focused = true }
         .onAppear { shell.banner(); focused = true }
+    }
+
+    private var cwdLabel: String {
+        let comps = shell.cwd.split(separator: "/").map(String.init)
+        return comps.isEmpty ? "/" : "/" + comps.last!
     }
 
     private var promptRow: some View {
